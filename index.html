@@ -35,6 +35,7 @@ html, body {
   transition: opacity var(--transition-duration) ease-in-out;
   pointer-events: none;
   background: #000;
+  will-change: opacity;
 }
 
 .artwork-layer.active {
@@ -69,16 +70,20 @@ html, body {
 
 <body>
 
-<div id="layerA" class="artwork-layer active">
-  <iframe title="Ego by Buitrago artwork A"
-          allow="fullscreen"
-          referrerpolicy="no-referrer"></iframe>
+<div id="layerA" class="artwork-layer">
+  <iframe
+    title="Ego by Buitrago artwork A"
+    allow="fullscreen"
+    referrerpolicy="no-referrer">
+  </iframe>
 </div>
 
 <div id="layerB" class="artwork-layer">
-  <iframe title="Ego by Buitrago artwork B"
-          allow="fullscreen"
-          referrerpolicy="no-referrer"></iframe>
+  <iframe
+    title="Ego by Buitrago artwork B"
+    allow="fullscreen"
+    referrerpolicy="no-referrer">
+  </iframe>
 </div>
 
 <div id="error"></div>
@@ -98,10 +103,23 @@ html, body {
     "https://ordinals.com/content/";
 
   // --------------------------------------------------
-  // CONFIGURACIÓN TEMPORAL DE LOS SIETE NFT
+  // CONFIGURACIÓN TEMPORAL
   // --------------------------------------------------
 
   const INTERVAL_MINUTES = 2;
+
+  // Tiempo máximo para completar una carga.
+  const LOAD_TIMEOUT = 25000;
+
+  // Tiempo adicional después de onload antes de mostrar.
+  const STABILIZATION_TIME = 1500;
+
+  // Espera antes de volver a intentar una carga fallida.
+  const RETRY_DELAY = 5000;
+
+  // --------------------------------------------------
+  // SECUENCIAS DE LOS SIETE NFT
+  // --------------------------------------------------
 
   const NFT_SEQUENCES = {
     1: [1, 0, 2, 8, 7],
@@ -126,7 +144,8 @@ html, body {
 
   const sequence = NFT_SEQUENCES[nftNumber];
 
-  const errorElement = document.getElementById("error");
+  const errorElement =
+    document.getElementById("error");
 
   if (
     !nftParameter ||
@@ -149,16 +168,135 @@ html, body {
     document.getElementById("layerB")
   ];
 
-  let activeLayer = 0;
+  const frames = [
+    layers[0].querySelector("iframe"),
+    layers[1].querySelector("iframe")
+  ];
+
+  // -1 significa que todavía no hay una obra visible.
+  let activeLayer = -1;
 
   let currentArtwork = null;
   let pendingArtwork = null;
 
   let loadCounter = 0;
+
+  let loadWatchdog = null;
+  let stabilizationTimer = null;
+
   let retryAfter = 0;
 
   // --------------------------------------------------
-  // CARGA SEGURA DE UNA OBRA
+  // LIMPIEZA DE TEMPORIZADORES
+  // --------------------------------------------------
+
+  function clearLoadTimers() {
+
+    if (loadWatchdog !== null) {
+      clearTimeout(loadWatchdog);
+      loadWatchdog = null;
+    }
+
+    if (stabilizationTimer !== null) {
+      clearTimeout(stabilizationTimer);
+      stabilizationTimer = null;
+    }
+  }
+
+  // --------------------------------------------------
+  // CANCELAR UNA CARGA OBSOLETA
+  // --------------------------------------------------
+
+  function cancelPendingLoad() {
+
+    if (pendingArtwork === null) {
+      return;
+    }
+
+    loadCounter++;
+
+    clearLoadTimers();
+
+    pendingArtwork = null;
+  }
+
+  // --------------------------------------------------
+  // MOSTRAR UNA OBRA YA CARGADA
+  // --------------------------------------------------
+
+  function commitArtwork(
+    artworkIndex,
+    layerIndex,
+    requestNumber
+  ) {
+
+    if (requestNumber !== loadCounter) {
+      return;
+    }
+
+    if (pendingArtwork !== artworkIndex) {
+      return;
+    }
+
+    const previousLayer = activeLayer;
+
+    // Registrar la nueva obra antes de cambiar las capas.
+    currentArtwork = artworkIndex;
+    activeLayer = layerIndex;
+    pendingArtwork = null;
+
+    retryAfter = 0;
+
+    clearLoadTimers();
+
+    // Primero activar la nueva capa.
+    // La anterior sigue visible durante el fundido.
+    layers[layerIndex].classList.add("active");
+
+    // Después iniciar el fundido de salida.
+    if (previousLayer !== -1) {
+      layers[previousLayer].classList.remove("active");
+    }
+
+    console.log(
+      "Ego: obra activa",
+      artworkIndex,
+      "NFT:",
+      nftNumber
+    );
+  }
+
+  // --------------------------------------------------
+  // FALLA O TIEMPO DE ESPERA AGOTADO
+  // --------------------------------------------------
+
+  function handleLoadFailure(
+    artworkIndex,
+    requestNumber,
+    reason
+  ) {
+
+    if (requestNumber !== loadCounter) {
+      return;
+    }
+
+    console.warn(
+      "Ego: no se pudo completar la carga de la obra",
+      artworkIndex,
+      reason
+    );
+
+    clearLoadTimers();
+
+    pendingArtwork = null;
+
+    // La obra anterior permanece visible.
+    // Se permitirá un nuevo intento.
+    retryAfter = Date.now() + RETRY_DELAY;
+  }
+
+  // --------------------------------------------------
+  // CARGA DE UNA NUEVA OBRA
   // --------------------------------------------------
 
   function showArtwork(artworkIndex) {
@@ -171,31 +309,42 @@ html, body {
       return;
     }
 
-    // Si ya está visible, cancelar una carga pendiente
-    // que haya quedado obsoleta.
+    // Si ya está visible, no hacer nada.
     if (artworkIndex === currentArtwork) {
 
       if (pendingArtwork !== null) {
-        loadCounter++;
-        pendingArtwork = null;
+        cancelPendingLoad();
       }
 
       return;
     }
 
-    // Evitar solicitar varias veces la misma obra.
+    // Si la misma obra ya está cargándose,
+    // no iniciar otra solicitud.
     if (artworkIndex === pendingArtwork) {
       return;
     }
 
-    // Esperar antes de reintentar una carga fallida.
+    // Si la obra solicitada cambió,
+    // cancelar la carga anterior.
+    if (pendingArtwork !== null) {
+      cancelPendingLoad();
+    }
+
+    // No insistir continuamente ante un fallo.
     if (Date.now() < retryAfter) {
       return;
     }
 
-    const nextLayer = activeLayer === 0 ? 1 : 0;
+    // Si todavía no hay obra visible,
+    // utilizar la primera capa.
+    const nextLayer =
+      activeLayer === -1
+        ? 0
+        : 1 - activeLayer;
+
     const layer = layers[nextLayer];
-    const frame = layer.querySelector("iframe");
+    const frame = frames[nextLayer];
 
     const requestNumber = ++loadCounter;
 
@@ -205,49 +354,75 @@ html, body {
       "i" +
       artworkIndex;
 
-    // Registrar la obra que está siendo solicitada.
     pendingArtwork = artworkIndex;
 
-    // La capa de destino permanece oculta durante la carga.
+    // La capa de destino debe permanecer oculta.
     layer.classList.remove("active");
+
+    // ----------------------------------------------
+    // CONTROL DE CARGA COMPLETADA
+    // ----------------------------------------------
 
     frame.onload = function () {
 
-      // Ignorar cargas anteriores que ya fueron reemplazadas.
       if (requestNumber !== loadCounter) {
         return;
       }
 
-      // Confirmar que la obra terminó de cargar.
-      currentArtwork = artworkIndex;
-      pendingArtwork = null;
-      retryAfter = 0;
+      // La navegación terminó.
+      // Esperar antes de cambiar la visualización.
+      if (loadWatchdog !== null) {
+        clearTimeout(loadWatchdog);
+        loadWatchdog = null;
+      }
 
-      // Mostrar la nueva obra y ocultar la anterior.
-      layer.classList.add("active");
+      stabilizationTimer = setTimeout(function () {
 
-      layers[activeLayer].classList.remove("active");
+        commitArtwork(
+          artworkIndex,
+          nextLayer,
+          requestNumber
+        );
 
-      activeLayer = nextLayer;
+      }, STABILIZATION_TIME);
     };
+
+    // ----------------------------------------------
+    // CONTROL DE ERROR
+    // ----------------------------------------------
 
     frame.onerror = function () {
 
-      if (requestNumber !== loadCounter) {
-        return;
-      }
+      handleLoadFailure(
+        artworkIndex,
+        requestNumber,
+        "Evento onerror"
+      );
+    };
 
-      console.error(
-        "Error cargando la obra:",
-        artworkURL
+    // ----------------------------------------------
+    // VIGILANTE DE TIEMPO DE ESPERA
+    // ----------------------------------------------
+
+    loadWatchdog = setTimeout(function () {
+
+      handleLoadFailure(
+        artworkIndex,
+        requestNumber,
+        "Tiempo de carga agotado"
       );
 
-      // Mantener visible la obra anterior.
-      pendingArtwork = null;
+    }, LOAD_TIMEOUT);
 
-      // Permitir un nuevo intento después de cinco segundos.
-      retryAfter = Date.now() + 5000;
-    };
+    // ----------------------------------------------
+    // INICIAR NAVEGACIÓN
+    // ----------------------------------------------
+
+    console.log(
+      "Ego: solicitando obra",
+      artworkIndex,
+      artworkURL
+    );
 
     frame.src = artworkURL;
   }
@@ -277,7 +452,7 @@ html, body {
 
   // --------------------------------------------------
   // MODO DE PRUEBA
-  // ?nft=1&art=0 muestra la primera posición.
+  // ?nft=1&art=0
   // --------------------------------------------------
 
   const testArtwork = params.get("art");
@@ -309,8 +484,7 @@ html, body {
 
     updateArtwork();
 
-    // Comprobación cada segundo.
-    // Las cargas pendientes no se reinician.
+    // Revisar el reloj cada segundo.
     setInterval(updateArtwork, 1000);
   }
 
