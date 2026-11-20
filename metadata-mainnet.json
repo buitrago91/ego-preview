@@ -2,7 +2,7 @@
 {
   "name": "Ego by Buitrago #1",
   "description": "Ego by Buitrago is a temporal generative art project. Each NFT presents a unique sequence of five original artworks that changes automatically according to local time, with a 12-minute interval between artworks.",
-  "animation_url": "https://ordinals.com/content/ID_DEL_HTML?nft=1",
+  "animation_url": "https://buitrago91.github.io/ego-preview/?nft=1",
   "attributes": [
     {
       "trait_type": "Collection",
