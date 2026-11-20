@@ -4,241 +4,280 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ego by Buitrago - Temporal Viewer</title>
+<title>Ego by Buitrago</title>
 
 <style>
+:root {
+  --artwork-zoom: 1.06;
+  --artwork-shift-y: -2.5%;
+  --transition-duration: 2s;
+}
+
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #000;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #000;
 }
 
-/* Responsive artwork crop */
-:root {
-    --artwork-zoom: 1.06;
-    --artwork-shift-y: -2.5%;
-    --transition-duration: 2s;
+.artwork-layer {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  opacity: 0;
+  transition: opacity var(--transition-duration) ease-in-out;
+  pointer-events: none;
+  background: #000;
 }
 
-.artwork-frame {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    border: 0;
-    background: #000;
-
-    /* Uniform scaling preserves artwork proportions */
-    transform:
-        translateY(var(--artwork-shift-y))
-        scale(var(--artwork-zoom));
-
-    transform-origin: center center;
-
-    opacity: 0;
-    transition: opacity var(--transition-duration) ease-in-out;
+.artwork-layer.active {
+  opacity: 1;
 }
 
-.artwork-frame.active {
-    opacity: 1;
+.artwork-layer iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Recorte y escala de la obra */
+.artwork-layer iframe {
+  transform: scale(var(--artwork-zoom));
+  transform-origin: center center;
+}
+
+#error {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  color: #fff;
+  background: #000;
+  font-family: monospace;
+  font-size: 13px;
+  text-align: center;
+  z-index: 10;
 }
 </style>
 </head>
 
 <body>
 
-<script>
-(async function () {
-    "use strict";
+<div id="layerA" class="artwork-layer active">
+  <iframe title="Ego by Buitrago artwork A"
+          allow="fullscreen"
+          referrerpolicy="no-referrer"></iframe>
+</div>
 
-    const TXID =
+<div id="layerB" class="artwork-layer">
+  <iframe title="Ego by Buitrago artwork B"
+          allow="fullscreen"
+          referrerpolicy="no-referrer"></iframe>
+</div>
+
+<div id="error"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // --------------------------------------------------
+  // BITCOIN ORDINALS: 35 OBRAS ORIGINALES
+  // --------------------------------------------------
+
+  const TXID =
     "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32";
 
-    const params = new URLSearchParams(
-        window.location.search
-    );
+  const ORDINALS_CONTENT =
+    "https://ordinals.com/content/";
 
-    // Identify this NFT's JSON configuration
-    const configPath = params.get("config");
+  // --------------------------------------------------
+  // CONFIGURACIÓN TEMPORAL DE LOS SIETE NFT
+  // Los índices son de base cero: obra 1 = i0.
+  // --------------------------------------------------
 
-    if (!configPath) {
-        document.body.textContent =
-            "ERROR: No NFT configuration specified.";
+  const INTERVAL_MINUTES = 12;
+
+  const NFT_SEQUENCES = {
+    1: [1, 0, 2, 8, 7],
+    2: [3, 5, 6, 12, 9],
+    3: [4, 13, 10, 14, 17],
+    4: [11, 15, 18, 16, 22],
+    5: [25, 19, 20, 21, 30],
+    6: [29, 25, 23, 27, 31],
+    7: [34, 26, 32, 28, 33]
+  };
+
+  // --------------------------------------------------
+  // IDENTIFICACIÓN DEL NFT
+  // Cada JSON deberá apuntar al HTML con ?nft=N
+  // --------------------------------------------------
+
+  const params = new URLSearchParams(
+    window.location.search
+  );
+
+  const nftParameter = params.get("nft");
+  const nftNumber = Number(nftParameter);
+
+  const sequence = NFT_SEQUENCES[nftNumber];
+
+  const errorElement = document.getElementById("error");
+
+  if (
+    !nftParameter ||
+    !Number.isInteger(nftNumber) ||
+    !sequence
+  ) {
+    errorElement.textContent =
+      "ERROR: NFT no válido. Utiliza ?nft=1 hasta ?nft=7.";
+
+    errorElement.style.display = "flex";
+    return;
+  }
+
+  // --------------------------------------------------
+  // CAPAS DE VISUALIZACIÓN
+  // Dos capas permiten hacer el crossfade.
+  // --------------------------------------------------
+
+  const layers = [
+    document.getElementById("layerA"),
+    document.getElementById("layerB")
+  ];
+
+  let activeLayer = 0;
+  let currentArtwork = null;
+  let loadCounter = 0;
+
+  // --------------------------------------------------
+  // CARGA DE UNA OBRA ORIGINAL
+  // artworkIndex corresponde a i0 ... i34.
+  // --------------------------------------------------
+
+  function showArtwork(artworkIndex) {
+
+    if (
+      !Number.isInteger(artworkIndex) ||
+      artworkIndex < 0 ||
+      artworkIndex > 34
+    ) {
+      return;
+    }
+
+    if (artworkIndex === currentArtwork) {
+      return;
+    }
+
+    currentArtwork = artworkIndex;
+
+    const nextLayer = activeLayer === 0 ? 1 : 0;
+    const layer = layers[nextLayer];
+    const frame = layer.querySelector("iframe");
+
+    const requestNumber = ++loadCounter;
+
+    const artworkURL =
+      ORDINALS_CONTENT +
+      TXID +
+      "i" +
+      artworkIndex;
+
+    layer.classList.remove("active");
+
+    frame.onload = function () {
+
+      // Evita que una carga anterior interrumpa
+      // una solicitud más reciente.
+      if (requestNumber !== loadCounter) {
         return;
+      }
+
+      layer.classList.add("active");
+
+      layers[activeLayer].classList.remove("active");
+
+      activeLayer = nextLayer;
+    };
+
+    frame.onerror = function () {
+      console.error(
+        "Error cargando la obra:",
+        artworkURL
+      );
+    };
+
+    frame.src = artworkURL;
+  }
+
+  // --------------------------------------------------
+  // RELOJ LOCAL
+  // Selecciona la obra según la hora del dispositivo.
+  // --------------------------------------------------
+
+  function updateArtwork() {
+
+    const now = new Date();
+
+    const minutesOfDay =
+      now.getHours() * 60 +
+      now.getMinutes();
+
+    const sequencePosition =
+      Math.floor(
+        minutesOfDay / INTERVAL_MINUTES
+      ) % sequence.length;
+
+    const artworkIndex =
+      sequence[sequencePosition];
+
+    showArtwork(artworkIndex);
+  }
+
+  // --------------------------------------------------
+  // MODO DE PRUEBA
+  // ?nft=1&art=0 fuerza la obra i0.
+  // art representa el índice Ordinals (0 a 34).
+  // --------------------------------------------------
+
+  const testArtwork = params.get("art");
+
+  if (testArtwork !== null) {
+
+    const forcedArtwork = Number(testArtwork);
+
+    if (
+      Number.isInteger(forcedArtwork) &&
+      forcedArtwork >= 0 &&
+      forcedArtwork <= 34
+    ) {
+      showArtwork(forcedArtwork);
+    } else {
+      errorElement.textContent =
+        "ERROR: El parámetro art debe estar entre 0 y 34.";
+
+      errorElement.style.display = "flex";
+      return;
     }
 
-    let configURL;
+  } else {
 
-    try {
-        configURL = new URL(
-            configPath,
-            window.location.href
-        );
+    updateArtwork();
 
-        if (
-            configURL.origin !== window.location.origin
-        ) {
-            throw new Error("Invalid configuration origin");
-        }
-
-    } catch (error) {
-        document.body.textContent =
-            "ERROR: Invalid configuration URL.";
-        return;
-    }
-
-    try {
-        // Load NFT configuration
-        const response = await fetch(configURL);
-
-        if (!response.ok) {
-            throw new Error("Could not load NFT JSON");
-        }
-
-        const metadata = await response.json();
-
-        const temporal = metadata.temporal_sequence;
-
-        if (
-            !temporal ||
-            !Array.isArray(temporal.artworks) ||
-            temporal.artworks.length === 0
-        ) {
-            throw new Error("Invalid temporal sequence");
-        }
-
-        const artworks = temporal.artworks;
-        const interval = Number(
-            temporal.interval_minutes
-        );
-
-        if (
-            !Number.isFinite(interval) ||
-            interval <= 0 ||
-            interval > 60
-        ) {
-            throw new Error("Invalid interval");
-        }
-
-        if (
-            !artworks.every(id =>
-                Number.isInteger(id) &&
-                id >= 0 &&
-                id <= 34
-            )
-        ) {
-            throw new Error("Invalid artwork index");
-        }
-
-        // Create two overlapping artwork frames
-        const frames = [
-            document.createElement("iframe"),
-            document.createElement("iframe")
-        ];
-
-        frames.forEach((frame, index) => {
-            frame.className = "artwork-frame";
-            frame.title =
-                (metadata.name || "Ego by Buitrago") +
-                " - Layer " + (index + 1);
-
-            document.body.appendChild(frame);
-        });
-
-        let activeIndex = -1;
-        let currentArtwork = -1;
-
-        function showArtwork(artworkID) {
-
-            if (artworkID === currentArtwork) {
-                return;
-            }
-
-            currentArtwork = artworkID;
-
-            const nextIndex =
-                activeIndex === 0 ? 1 : 0;
-
-            const nextFrame = frames[nextIndex];
-
-            nextFrame.classList.remove("active");
-
-            nextFrame.onload = function () {
-
-                // First artwork appears immediately
-                if (activeIndex === -1) {
-                    nextFrame.classList.add("active");
-                    activeIndex = nextIndex;
-                    return;
-                }
-
-                // Crossfade between artworks
-                const previousFrame = frames[activeIndex];
-
-                requestAnimationFrame(() => {
-                    nextFrame.classList.add("active");
-                    previousFrame.classList.remove("active");
-
-                    activeIndex = nextIndex;
-                });
-            };
-
-            const inscriptionID =
-                TXID + "i" + artworkID;
-
-            nextFrame.src =
-                "https://ordinals.com/content/" +
-                inscriptionID;
-        }
-
-        function updateArtwork() {
-
-            // Manual selection for testing
-            const manualArt = params.get("art");
-
-            if (manualArt !== null) {
-
-                const id = Number(manualArt);
-
-                if (
-                    Number.isInteger(id) &&
-                    id >= 0 &&
-                    id <= 34
-                ) {
-                    showArtwork(id);
-                }
-
-                return;
-            }
-
-            // Read local device clock
-            const minute = new Date().getMinutes();
-
-            const position =
-                Math.floor(minute / interval) %
-                artworks.length;
-
-            showArtwork(artworks[position]);
-        }
-
-        // Display first artwork
-        updateArtwork();
-
-        // Check local clock every second
-        setInterval(updateArtwork, 1000);
-
-    } catch (error) {
-        document.body.textContent =
-            "Ego by Buitrago - " + error.message;
-
-        console.error(error);
-    }
+    // Comprobación cada segundo.
+    // Solo cambia la obra cuando corresponde.
+    setInterval(updateArtwork, 1000);
+  }
 
 })();
 </script>
