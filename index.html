@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,22 +8,22 @@
 
 <style>
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html, body {
-  margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: #000;
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
 }
 
 iframe {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: block;
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
 }
 </style>
 </head>
@@ -31,27 +32,39 @@ iframe {
 
 <script>
 (function () {
-  "use strict";
+    "use strict";
 
-  const TXID =
+    // Bitcoin transaction containing the 35 artworks
+    const TXID =
     "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32";
 
-  const params = new URLSearchParams(window.location.search);
-  const id = Number(params.get("id"));
+    // Read artwork ID from the URL
+    const params = new URLSearchParams(
+        window.location.search
+    );
 
-  if (!Number.isInteger(id) || id < 0 || id > 34) {
-    document.body.innerHTML =
-      "<p style='color:white'>Invalid artwork ID</p>";
-    return;
-  }
+    // Default artwork is #1 (i0)
+    const id = Number(params.get("id") ?? 0);
 
-  const inscriptionID = TXID + "i" + id;
+    // Validate artwork ID
+    if (!Number.isInteger(id) || id < 0 || id > 34) {
+        document.body.innerHTML = "";
+        return;
+    }
 
-  const frame = document.createElement("iframe");
-  frame.src = "https://ordinals.com/content/" + inscriptionID;
-  frame.title = "Ego by Buitrago";
+    // Build Bitcoin Ordinal inscription ID
+    const inscriptionID = TXID + "i" + id;
 
-  document.body.appendChild(frame);
+    // Create artwork viewer
+    const frame = document.createElement("iframe");
+
+    frame.src =
+        "https://ordinals.com/content/" + inscriptionID;
+
+    frame.title = "Ego by Buitrago";
+
+    document.body.appendChild(frame);
+
 })();
 </script>
 
