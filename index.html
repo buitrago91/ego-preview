@@ -19,7 +19,12 @@ html, body {
     background: #000;
 }
 
-/* Two overlapping artwork layers */
+/* Responsive artwork crop */
+:root {
+    --artwork-zoom: 1.06;
+    --artwork-shift-y: -2.5%;
+    --transition-duration: 2s;
+}
 
 .artwork-frame {
     position: absolute;
@@ -29,11 +34,17 @@ html, body {
     border: 0;
     background: #000;
 
+    /* Uniform scaling preserves artwork proportions */
+    transform:
+        translateY(var(--artwork-shift-y))
+        scale(var(--artwork-zoom));
+
+    transform-origin: center center;
+
     opacity: 0;
-    transition: opacity 2s ease-in-out;
+    transition: opacity var(--transition-duration) ease-in-out;
 }
 
-/* The visible artwork */
 .artwork-frame.active {
     opacity: 1;
 }
@@ -125,7 +136,7 @@ html, body {
             throw new Error("Invalid artwork index");
         }
 
-        // Create two overlapping frames
+        // Create two overlapping artwork frames
         const frames = [
             document.createElement("iframe"),
             document.createElement("iframe")
@@ -151,18 +162,16 @@ html, body {
 
             currentArtwork = artworkID;
 
-            // Select the inactive frame
             const nextIndex =
                 activeIndex === 0 ? 1 : 0;
 
             const nextFrame = frames[nextIndex];
 
-            // Prepare the new artwork behind the visible one
             nextFrame.classList.remove("active");
 
             nextFrame.onload = function () {
 
-                // First artwork: show without transition
+                // First artwork appears immediately
                 if (activeIndex === -1) {
                     nextFrame.classList.add("active");
                     activeIndex = nextIndex;
@@ -173,7 +182,6 @@ html, body {
                 const previousFrame = frames[activeIndex];
 
                 requestAnimationFrame(() => {
-
                     nextFrame.classList.add("active");
                     previousFrame.classList.remove("active");
 
@@ -181,7 +189,6 @@ html, body {
                 });
             };
 
-            // Load the selected Bitcoin Ordinal
             const inscriptionID =
                 TXID + "i" + artworkID;
 
@@ -192,7 +199,7 @@ html, body {
 
         function updateArtwork() {
 
-            // Manual artwork selection for testing
+            // Manual selection for testing
             const manualArt = params.get("art");
 
             if (manualArt !== null) {
@@ -213,19 +220,17 @@ html, body {
             // Read local device clock
             const minute = new Date().getMinutes();
 
-            // Calculate sequence position
             const position =
                 Math.floor(minute / interval) %
                 artworks.length;
 
-            // Select artwork from this NFT's JSON
             showArtwork(artworks[position]);
         }
 
-        // Show first artwork immediately
+        // Display first artwork
         updateArtwork();
 
-        // Check local time every second
+        // Check local clock every second
         setInterval(updateArtwork, 1000);
 
     } catch (error) {
