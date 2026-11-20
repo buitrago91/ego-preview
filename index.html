@@ -19,11 +19,23 @@ html, body {
     background: #000;
 }
 
-iframe {
-    display: block;
+/* Two overlapping artwork layers */
+
+.artwork-frame {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     border: 0;
+    background: #000;
+
+    opacity: 0;
+    transition: opacity 2s ease-in-out;
+}
+
+/* The visible artwork */
+.artwork-frame.active {
+    opacity: 1;
 }
 </style>
 </head>
@@ -41,7 +53,7 @@ iframe {
         window.location.search
     );
 
-    // Identify the JSON assigned to this NFT
+    // Identify this NFT's JSON configuration
     const configPath = params.get("config");
 
     if (!configPath) {
@@ -53,10 +65,14 @@ iframe {
     let configURL;
 
     try {
-        configURL = new URL(configPath, window.location.href);
+        configURL = new URL(
+            configPath,
+            window.location.href
+        );
 
-        // Only allow configuration files from this website
-        if (configURL.origin !== window.location.origin) {
+        if (
+            configURL.origin !== window.location.origin
+        ) {
             throw new Error("Invalid configuration origin");
         }
 
@@ -67,7 +83,7 @@ iframe {
     }
 
     try {
-        // Load this NFT's JSON configuration
+        // Load NFT configuration
         const response = await fetch(configURL);
 
         if (!response.ok) {
@@ -87,7 +103,9 @@ iframe {
         }
 
         const artworks = temporal.artworks;
-        const interval = Number(temporal.interval_minutes);
+        const interval = Number(
+            temporal.interval_minutes
+        );
 
         if (
             !Number.isFinite(interval) ||
@@ -104,15 +122,26 @@ iframe {
                 id <= 34
             )
         ) {
-            throw new Error("Invalid Ordinals artwork index");
+            throw new Error("Invalid artwork index");
         }
 
+        // Create two overlapping frames
+        const frames = [
+            document.createElement("iframe"),
+            document.createElement("iframe")
+        ];
+
+        frames.forEach((frame, index) => {
+            frame.className = "artwork-frame";
+            frame.title =
+                (metadata.name || "Ego by Buitrago") +
+                " - Layer " + (index + 1);
+
+            document.body.appendChild(frame);
+        });
+
+        let activeIndex = -1;
         let currentArtwork = -1;
-
-        const frame = document.createElement("iframe");
-        frame.title = metadata.name || "Ego by Buitrago";
-
-        document.body.appendChild(frame);
 
         function showArtwork(artworkID) {
 
@@ -122,19 +151,52 @@ iframe {
 
             currentArtwork = artworkID;
 
-            const inscriptionID = TXID + "i" + artworkID;
+            // Select the inactive frame
+            const nextIndex =
+                activeIndex === 0 ? 1 : 0;
 
-            frame.src =
+            const nextFrame = frames[nextIndex];
+
+            // Prepare the new artwork behind the visible one
+            nextFrame.classList.remove("active");
+
+            nextFrame.onload = function () {
+
+                // First artwork: show without transition
+                if (activeIndex === -1) {
+                    nextFrame.classList.add("active");
+                    activeIndex = nextIndex;
+                    return;
+                }
+
+                // Crossfade between artworks
+                const previousFrame = frames[activeIndex];
+
+                requestAnimationFrame(() => {
+
+                    nextFrame.classList.add("active");
+                    previousFrame.classList.remove("active");
+
+                    activeIndex = nextIndex;
+                });
+            };
+
+            // Load the selected Bitcoin Ordinal
+            const inscriptionID =
+                TXID + "i" + artworkID;
+
+            nextFrame.src =
                 "https://ordinals.com/content/" +
                 inscriptionID;
         }
 
         function updateArtwork() {
 
-            // Optional manual test: ?art=2
+            // Manual artwork selection for testing
             const manualArt = params.get("art");
 
             if (manualArt !== null) {
+
                 const id = Number(manualArt);
 
                 if (
@@ -148,19 +210,22 @@ iframe {
                 return;
             }
 
-            // Read the local device clock
+            // Read local device clock
             const minute = new Date().getMinutes();
 
-            // Calculate the position in this NFT's sequence
+            // Calculate sequence position
             const position =
-                Math.floor(minute / interval) % artworks.length;
+                Math.floor(minute / interval) %
+                artworks.length;
 
+            // Select artwork from this NFT's JSON
             showArtwork(artworks[position]);
         }
 
+        // Show first artwork immediately
         updateArtwork();
 
-        // Check the clock every second
+        // Check local time every second
         setInterval(updateArtwork, 1000);
 
     } catch (error) {
