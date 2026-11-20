@@ -1,10 +1,10 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ego by Buitrago</title>
+<title>Ego by Buitrago - Temporal</title>
 
 <style>
 * {
@@ -38,32 +38,87 @@ iframe {
     const TXID =
     "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32";
 
-    // Read artwork ID from the URL
-    const params = new URLSearchParams(
-        window.location.search
-    );
+    // Custom artwork sequence:
+    // Artwork 2, 3, 1, 8, 9
+    // Ordinals indexes start at zero
+    const artworks = [1, 2, 0, 7, 8];
 
-    // Default artwork is #1 (i0)
-    const id = Number(params.get("id") ?? 0);
+    // Change artwork every 12 minutes
+    const INTERVAL_MINUTES = 12;
 
-    // Validate artwork ID
-    if (!Number.isInteger(id) || id < 0 || id > 34) {
-        document.body.innerHTML = "";
-        return;
-    }
-
-    // Build Bitcoin Ordinal inscription ID
-    const inscriptionID = TXID + "i" + id;
+    let currentArtwork = -1;
 
     // Create artwork viewer
     const frame = document.createElement("iframe");
 
-    frame.src =
-        "https://ordinals.com/content/" + inscriptionID;
-
     frame.title = "Ego by Buitrago";
 
     document.body.appendChild(frame);
+
+    // Optional manual selection for testing:
+    // ?id=0, ?id=1, ?id=2 ... ?id=34
+    const params = new URLSearchParams(
+        window.location.search
+    );
+
+    const manualID = params.get("id");
+
+    function showArtwork(artworkID) {
+
+        // Avoid reloading the same artwork
+        if (artworkID === currentArtwork) {
+            return;
+        }
+
+        currentArtwork = artworkID;
+
+        // Build Ordinals inscription ID
+        const inscriptionID =
+            TXID + "i" + artworkID;
+
+        // Load original artwork from Bitcoin
+        frame.src =
+            "https://ordinals.com/content/" +
+            inscriptionID;
+    }
+
+    function updateArtwork() {
+
+        // Manual selection takes priority
+        if (manualID !== null) {
+
+            const id = Number(manualID);
+
+            if (
+                Number.isInteger(id) &&
+                id >= 0 &&
+                id <= 34
+            ) {
+                showArtwork(id);
+            }
+
+            return;
+        }
+
+        // Read local device clock
+        const minute = new Date().getMinutes();
+
+        // Determine position in custom sequence
+        const position = Math.floor(
+            minute / INTERVAL_MINUTES
+        );
+
+        // Select the corresponding Ordinal index
+        const artworkID = artworks[position];
+
+        showArtwork(artworkID);
+    }
+
+    // Display the correct artwork immediately
+    updateArtwork();
+
+    // Check local time every second
+    setInterval(updateArtwork, 1000);
 
 })();
 </script>
