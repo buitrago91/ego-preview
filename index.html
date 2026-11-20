@@ -46,10 +46,6 @@ html, body {
   height: 100%;
   border: 0;
   display: block;
-}
-
-/* Recorte y escala de la obra */
-.artwork-layer iframe {
   transform: scale(var(--artwork-zoom));
   transform-origin: center center;
 }
@@ -103,7 +99,7 @@ html, body {
 
   // --------------------------------------------------
   // CONFIGURACIÓN TEMPORAL DE LOS SIETE NFT
-  // Los índices son de base cero: obra 1 = i0.
+  // Índices base cero: obra 1 = i0.
   // --------------------------------------------------
 
   const INTERVAL_MINUTES = 12;
@@ -120,7 +116,6 @@ html, body {
 
   // --------------------------------------------------
   // IDENTIFICACIÓN DEL NFT
-  // Cada JSON deberá apuntar al HTML con ?nft=N
   // --------------------------------------------------
 
   const params = new URLSearchParams(
@@ -148,7 +143,6 @@ html, body {
 
   // --------------------------------------------------
   // CAPAS DE VISUALIZACIÓN
-  // Dos capas permiten hacer el crossfade.
   // --------------------------------------------------
 
   const layers = [
@@ -179,8 +173,6 @@ html, body {
       return;
     }
 
-    currentArtwork = artworkIndex;
-
     const nextLayer = activeLayer === 0 ? 1 : 0;
     const layer = layers[nextLayer];
     const frame = layer.querySelector("iframe");
@@ -197,11 +189,11 @@ html, body {
 
     frame.onload = function () {
 
-      // Evita que una carga anterior interrumpa
-      // una solicitud más reciente.
       if (requestNumber !== loadCounter) {
         return;
       }
+
+      currentArtwork = artworkIndex;
 
       layer.classList.add("active");
 
@@ -222,7 +214,6 @@ html, body {
 
   // --------------------------------------------------
   // RELOJ LOCAL
-  // Selecciona la obra según la hora del dispositivo.
   // --------------------------------------------------
 
   function updateArtwork() {
@@ -246,36 +237,46 @@ html, body {
 
   // --------------------------------------------------
   // MODO DE PRUEBA
-  // ?nft=1&art=0 fuerza la obra i0.
-  // art representa el índice Ordinals (0 a 34).
+  // ?nft=1&art=0 muestra la primera posición
+  // de la secuencia del NFT, NO la inscripción i0.
+  //
+  // art=0 -> sequence[0]
+  // art=1 -> sequence[1]
+  // art=2 -> sequence[2]
+  // art=3 -> sequence[3]
+  // art=4 -> sequence[4]
   // --------------------------------------------------
 
   const testArtwork = params.get("art");
 
   if (testArtwork !== null) {
 
-    const forcedArtwork = Number(testArtwork);
+    const forcedPosition = Number(testArtwork);
 
     if (
-      Number.isInteger(forcedArtwork) &&
-      forcedArtwork >= 0 &&
-      forcedArtwork <= 34
+      !Number.isInteger(forcedPosition) ||
+      forcedPosition < 0 ||
+      forcedPosition >= sequence.length
     ) {
-      showArtwork(forcedArtwork);
-    } else {
       errorElement.textContent =
-        "ERROR: El parámetro art debe estar entre 0 y 34.";
+        "ERROR: art debe estar entre 0 y " +
+        (sequence.length - 1) +
+        " para este NFT.";
 
       errorElement.style.display = "flex";
       return;
     }
+
+    const artworkIndex =
+      sequence[forcedPosition];
+
+    showArtwork(artworkIndex);
 
   } else {
 
     updateArtwork();
 
     // Comprobación cada segundo.
-    // Solo cambia la obra cuando corresponde.
     setInterval(updateArtwork, 1000);
   }
 
