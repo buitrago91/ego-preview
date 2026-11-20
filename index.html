@@ -1,29 +1,28 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ego by Buitrago - Preview</title>
+<title>Ego by Buitrago</title>
 
 <style>
 * {
-    box-sizing: border-box;
+  box-sizing: border-box;
 }
 
 html, body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #000;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
 }
 
 iframe {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
 }
 </style>
 </head>
@@ -32,20 +31,27 @@ iframe {
 
 <script>
 (function () {
-    "use strict";
+  "use strict";
 
-    const INSCRIPTION_ID =
-    "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32i0";
+  const TXID =
+    "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32";
 
-    const frame = document.createElement("iframe");
+  const params = new URLSearchParams(window.location.search);
+  const id = Number(params.get("id"));
 
-    frame.src =
-    "https://ordinals.com/content/" + INSCRIPTION_ID;
+  if (!Number.isInteger(id) || id < 0 || id > 34) {
+    document.body.innerHTML =
+      "<p style='color:white'>Invalid artwork ID</p>";
+    return;
+  }
 
-    frame.title = "Ego by Buitrago";
+  const inscriptionID = TXID + "i" + id;
 
-    document.body.appendChild(frame);
+  const frame = document.createElement("iframe");
+  frame.src = "https://ordinals.com/content/" + inscriptionID;
+  frame.title = "Ego by Buitrago";
 
+  document.body.appendChild(frame);
 })();
 </script>
 
