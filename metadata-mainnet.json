@@ -2,7 +2,7 @@
 {
   "name": "Ego by Buitrago - OpenSea Test #1",
   "description": "Experimental Ethereum NFT referencing an original interactive digital artwork inscribed on Bitcoin. The original Ordinal remains on Bitcoin.",
-  "image": "https://ordinals.com/inscription/bd44f3bef11dfd05e7d97fd403bc7164c324875c82e8160f3d61da9baa212035i0",
+  "image": "https://ordinals.com/content/bd44f3bef11dfd05e7d97fd403bc7164c324875c82e8160f3d61da9baa212035i0",
   "animation_url": "https://buitrago91.github.io/ego-preview/",
   "external_url": "https://ordinals.com/inscription/26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32i0",
   "attributes": [
