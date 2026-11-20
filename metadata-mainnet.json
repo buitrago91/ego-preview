@@ -1,30 +1,32 @@
 
 {
-  "name": "Ego by Buitrago - OpenSea Test #1",
-  "description": "Experimental temporal NFT referencing original digital artworks inscribed on Bitcoin. The artwork displayed changes according to the local device clock.",
-  "image": "https://raw2.seadn.io/ethereum/0x20ae3658f0b7dd449d9d37da433e658b18fe4bdd/3b31fb8ac52e7bf7b25ea085970693/5d3b31fb8ac52e7bf7b25ea085970693.html",
-  "animation_url": "https://ordinals.com/content/aabfc61b892609bb59540cd83dc399837a802014f3a7476f5b74f429e2edd1c4i0?config=https%3A%2F%2Fbuitrago91.github.io%2Fego-preview%2Fmetadata-mainnet.json",
-  "external_url": "https://ordinals.com/inscription/26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32i0",
+  "name": "Ego by Buitrago #1",
+  "description": "Ego by Buitrago is a temporal generative art project. Each NFT presents a unique sequence of five original artworks that changes automatically according to local time, with a 12-minute interval between artworks.",
+  "animation_url": "https://ordinals.com/content/ID_DEL_HTML?nft=1",
   "attributes": [
     {
       "trait_type": "Collection",
       "value": "Ego by Buitrago"
     },
     {
-      "trait_type": "Network",
-      "value": "Ethereum Mainnet"
+      "trait_type": "NFT Number",
+      "value": 1
     },
     {
-      "trait_type": "Origin",
+      "trait_type": "Sequence Length",
+      "value": 5
+    },
+    {
+      "trait_type": "Transition Interval",
+      "value": "12 minutes"
+    },
+    {
+      "trait_type": "Playback",
+      "value": "Time-based"
+    },
+    {
+      "trait_type": "Blockchain",
       "value": "Bitcoin Ordinals"
-    },
-    {
-      "trait_type": "Display",
-      "value": "Temporal"
     }
-  ],
-  "temporal_sequence": {
-    "interval_minutes": 12,
-    "artworks": [1, 2, 0, 7, 8]
-  }
+  ]
 }
