@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ego by Buitrago - Temporal</title>
+<title>Ego by Buitrago - Temporal Viewer</title>
 
 <style>
 * {
@@ -31,94 +31,144 @@ iframe {
 <body>
 
 <script>
-(function () {
+(async function () {
     "use strict";
 
-    // Bitcoin transaction containing the 35 artworks
     const TXID =
     "26f637df52c2289d33f74f01cfbf39c33769560a422234d499d907a4f313ba32";
 
-    // Custom artwork sequence:
-    // Artwork 2, 3, 1, 8, 9
-    // Ordinals indexes start at zero
-    const artworks = [1, 2, 0, 7, 8];
-
-    // Change artwork every 12 minutes
-    const INTERVAL_MINUTES = 12;
-
-    let currentArtwork = -1;
-
-    // Create artwork viewer
-    const frame = document.createElement("iframe");
-
-    frame.title = "Ego by Buitrago";
-
-    document.body.appendChild(frame);
-
-    // Optional manual selection for testing:
-    // ?id=0, ?id=1, ?id=2 ... ?id=34
     const params = new URLSearchParams(
         window.location.search
     );
 
-    const manualID = params.get("id");
+    // Identify the JSON assigned to this NFT
+    const configPath = params.get("config");
 
-    function showArtwork(artworkID) {
-
-        // Avoid reloading the same artwork
-        if (artworkID === currentArtwork) {
-            return;
-        }
-
-        currentArtwork = artworkID;
-
-        // Build Ordinals inscription ID
-        const inscriptionID =
-            TXID + "i" + artworkID;
-
-        // Load original artwork from Bitcoin
-        frame.src =
-            "https://ordinals.com/content/" +
-            inscriptionID;
+    if (!configPath) {
+        document.body.textContent =
+            "ERROR: No NFT configuration specified.";
+        return;
     }
 
-    function updateArtwork() {
+    let configURL;
 
-        // Manual selection takes priority
-        if (manualID !== null) {
+    try {
+        configURL = new URL(configPath, window.location.href);
 
-            const id = Number(manualID);
+        // Only allow configuration files from this website
+        if (configURL.origin !== window.location.origin) {
+            throw new Error("Invalid configuration origin");
+        }
 
-            if (
+    } catch (error) {
+        document.body.textContent =
+            "ERROR: Invalid configuration URL.";
+        return;
+    }
+
+    try {
+        // Load this NFT's JSON configuration
+        const response = await fetch(configURL);
+
+        if (!response.ok) {
+            throw new Error("Could not load NFT JSON");
+        }
+
+        const metadata = await response.json();
+
+        const temporal = metadata.temporal_sequence;
+
+        if (
+            !temporal ||
+            !Array.isArray(temporal.artworks) ||
+            temporal.artworks.length === 0
+        ) {
+            throw new Error("Invalid temporal sequence");
+        }
+
+        const artworks = temporal.artworks;
+        const interval = Number(temporal.interval_minutes);
+
+        if (
+            !Number.isFinite(interval) ||
+            interval <= 0 ||
+            interval > 60
+        ) {
+            throw new Error("Invalid interval");
+        }
+
+        if (
+            !artworks.every(id =>
                 Number.isInteger(id) &&
                 id >= 0 &&
                 id <= 34
-            ) {
-                showArtwork(id);
-            }
-
-            return;
+            )
+        ) {
+            throw new Error("Invalid Ordinals artwork index");
         }
 
-        // Read local device clock
-        const minute = new Date().getMinutes();
+        let currentArtwork = -1;
 
-        // Determine position in custom sequence
-        const position = Math.floor(
-            minute / INTERVAL_MINUTES
-        );
+        const frame = document.createElement("iframe");
+        frame.title = metadata.name || "Ego by Buitrago";
 
-        // Select the corresponding Ordinal index
-        const artworkID = artworks[position];
+        document.body.appendChild(frame);
 
-        showArtwork(artworkID);
+        function showArtwork(artworkID) {
+
+            if (artworkID === currentArtwork) {
+                return;
+            }
+
+            currentArtwork = artworkID;
+
+            const inscriptionID = TXID + "i" + artworkID;
+
+            frame.src =
+                "https://ordinals.com/content/" +
+                inscriptionID;
+        }
+
+        function updateArtwork() {
+
+            // Optional manual test: ?art=2
+            const manualArt = params.get("art");
+
+            if (manualArt !== null) {
+                const id = Number(manualArt);
+
+                if (
+                    Number.isInteger(id) &&
+                    id >= 0 &&
+                    id <= 34
+                ) {
+                    showArtwork(id);
+                }
+
+                return;
+            }
+
+            // Read the local device clock
+            const minute = new Date().getMinutes();
+
+            // Calculate the position in this NFT's sequence
+            const position =
+                Math.floor(minute / interval) % artworks.length;
+
+            showArtwork(artworks[position]);
+        }
+
+        updateArtwork();
+
+        // Check the clock every second
+        setInterval(updateArtwork, 1000);
+
+    } catch (error) {
+        document.body.textContent =
+            "Ego by Buitrago - " + error.message;
+
+        console.error(error);
     }
-
-    // Display the correct artwork immediately
-    updateArtwork();
-
-    // Check local time every second
-    setInterval(updateArtwork, 1000);
 
 })();
 </script>
