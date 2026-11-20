@@ -1,0 +1,152 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ego by Buitrago - ERC721 Viewer</title>
+
+<style>
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+#status {
+    position: absolute;
+    z-index: 2;
+    top: 10px;
+    left: 10px;
+    padding: 8px 12px;
+    background: #222;
+    border-radius: 5px;
+    font-size: 12px;
+}
+
+iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+</style>
+</head>
+
+<body>
+
+<div id="status">Connecting to Sepolia...</div>
+
+<script>
+(async function () {
+    "use strict";
+
+    const CONTRACT =
+    "0xcb62f8b224c1ffdf73075e5f1c93a8f07cdfa0ed";
+
+    const TOKEN_ID = 1;
+
+    const RPC =
+    "https://ethereum-sepolia-rpc.publicnode.com";
+
+    const status = document.getElementById("status");
+
+    function update(message) {
+        status.textContent = message;
+    }
+
+    try {
+        // 1. Read tokenURI(uint256) from the ERC721 contract
+
+        const tokenHex =
+            TOKEN_ID.toString(16).padStart(64, "0");
+
+        const response = await fetch(RPC, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                jsonrpc: "2.0",
+                method: "eth_call",
+                params: [{
+                    to: CONTRACT,
+                    data: "0xc87b56dd" + tokenHex
+                }, "latest"],
+                id: 1
+            })
+        });
+
+        const rpcResult = await response.json();
+
+        if (rpcResult.error) {
+            throw new Error(rpcResult.error.message);
+        }
+
+        const hex = rpcResult.result.slice(2);
+
+        const offset = Number(
+            BigInt("0x" + hex.slice(0, 64))
+        ) * 2;
+
+        const length = Number(
+            BigInt("0x" + hex.slice(offset, offset + 64))
+        );
+
+        const uriHex = hex.slice(
+            offset + 64,
+            offset + 64 + length * 2
+        );
+
+        const tokenURI = new TextDecoder().decode(
+            Uint8Array.from(
+                uriHex.match(/.{2}/g),
+                byte => parseInt(byte, 16)
+            )
+        );
+
+        update("Loading NFT metadata...");
+
+        // 2. Fetch metadata JSON
+
+        const metadataResponse = await fetch(tokenURI);
+
+        if (!metadataResponse.ok) {
+            throw new Error("Metadata could not be loaded");
+        }
+
+        const metadata = await metadataResponse.json();
+
+        // 3. Load animation_url
+
+        if (!metadata.animation_url) {
+            throw new Error("No animation_url found");
+        }
+
+        update("Loading " + metadata.name + "...");
+
+        const frame = document.createElement("iframe");
+
+        frame.src = metadata.animation_url;
+        frame.title = metadata.name;
+
+        document.body.appendChild(frame);
+
+        update("ERC721 #" + TOKEN_ID + " - " + metadata.name);
+
+    } catch (error) {
+        update("ERROR: " + error.message);
+        console.error(error);
+    }
+
+})();
+</script>
+
+</body>
+</html>
